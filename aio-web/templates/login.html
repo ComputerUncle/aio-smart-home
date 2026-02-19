@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIO Smart Home</title>
+</head>
+<body>
+<div class = 'o'>
+<div class = 'box'>
+<img src="/static/logo.jpg" alt="AIO" width="200" height="200">
+<br>
+    <form action="/login" method="post" >
+       User: <input type="text" name="name" ><br><br>
+        Password: <input type="password" name="pass" required><br><br>
+       
+
+        <input type="submit" value="Login">
+    </form>
+<br>
+<div class = 'text'> {{ status }} </div>
+</div>
+</div>
+</body>
+<style>
+.o{
+   justify-content: center;
+  place-items: center;
+
+}
+.box {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin: 10px;
+      width: 300px;
+      text-align: center;
+      justify-content: center; 
+
+
+    }
+.text {
+color: #ff0000;
+}
+  
+
+</style>
+</html>

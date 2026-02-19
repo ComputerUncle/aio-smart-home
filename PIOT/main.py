@@ -102,10 +102,62 @@ def load_auth():
     if not user:
         user = config.get('KEY','name')
         password = config.get('KEY','pass')
+        
+def on_connect(client, userdata, flags, rc):
+    print("Connected:", rc)
+    client.subscribe(f"{mqttuser}/#")
+
+
+def on_message(client, userdata, msg):
+    global light, window, autowindow, autolight
+    topic = msg.topic
+ 
+    if topic.endswith("/light/command"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            light = True
+        elif payload == 0:
+            light = False
+
+    elif topic.endswith("/camera/command"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            cam.take()
+            send_image_mqtt()
+
+    elif topic.endswith("/light/auto/command"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            autolight = True
+        elif payload == 0:
+            autolight = False
+
+    elif topic.endswith("/window/command"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            window = True
+        elif payload == 0:
+            window = False
+
+    elif topic.endswith("/window/auto/command"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            autowindow = True
+        elif payload == 0:
+            autowindow = False
+    elif topic.endswith("/resetalarm"):
+        payload = int(msg.payload.decode())
+        if payload == 1:
+            resetalarm()
+ 
 load_auth()
 load_mqttconfig()
 client.username_pw_set(mqttuser,mqttpassword)
+client.on_connect = on_connect
+client.on_message = on_message
 client.connect(ip,int(port),60)
+client.loop_start() 
+
 lcd= LCD.lcd()
 dht.init()
 reader = rfid.init()
@@ -172,8 +224,28 @@ def log(message):
         conn.commit()
         cur.close()
         conn.close()  
+        client.publish(f"{mqttuser}/event", message)
     except Exception as e:
         print(e)
+        
+def load_logs():
+    try:
+        items = []
+        conn = connect_db()
+        cur = conn.cursor()
+        
+     
+        cur.execute("""SELECT * FROM logs
+        WHERE house = %s
+        ORDER BY date_time DESC;""", (mqttuser,))
+        rows = cur.fetchall()
+        for i in rows:
+            items.append({"message":i[2],"datetime":i[3]})
+        cur.close()
+        conn.close()
+        return (items)
+    except:
+        return ("error")
 def map( x,in_min, in_max, out_min, out_max):
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
@@ -205,7 +277,7 @@ def key_pressed(key):
         else:
             pininput.append(key)
             lcd.lcd_display_string(str(key),2,len(pininput)-1)
-        
+    
 def mqttupdate():
     global temp,humidity,error,mqttuser,door_lock,alarm,status,autolight
   
@@ -217,6 +289,7 @@ def mqttupdate():
     client.publish(f"{mqttuser}/mode", mode)
         #Light
     client.publish(f"{mqttuser}/light/auto", "Auto" if autolight else "Manual", retain = True)
+    client.publish(f"{mqttuser}/light/state", light, retain = True)
         #Window
     client.publish(f"{mqttuser}/window", window, retain = True)
     client.publish(f"{mqttuser}/window/auto", "Auto" if autowindow else "Manual", retain = True)
@@ -250,6 +323,7 @@ def load_user():
         print(f"Error loading CSV: {e}")
 
     return user
+ 
     
 def add_user(name, rfid):
 
@@ -305,7 +379,8 @@ def send_image_mqtt():
     with open("static/image/image.jpg", "rb") as f:
         image_bytes = f.read()
     client.publish(f"{mqttuser}/camera", image_bytes,retain = True)
-
+def show_image_event():
+    client.publish(f"{mqttuser}/event/image", "1")
 def doorlock():
     global lockcooldown,locktimer,prevlock,door_lock,doorlocktimer,ct,last_access
     if lockcooldown >0:
@@ -467,11 +542,13 @@ def alarmsys():
             alarm = True
             if alarm != prevalarm:
                 status = "FIRE DETECTED!"
+                cam.take()
+                send_image_mqtt()
                 log("Fire alarm activated")
+                show_image_event()
                 prevalarm = alarm
                 lock = False
                 buzzer.turn_on()
-                cam.take()
         elif lockdown == True:
             alarm = True
             if alarm != prevalarm:
@@ -480,9 +557,11 @@ def alarmsys():
                 autolight = False
                 light = True
                 cam.take()
+                send_image_mqtt()
                 buzzer.turn_on()
                 status = "Intruder detected"
                 log("Intruder detected, lockdown activated!")
+                show_image_event()
                 prevalarm = alarm
         elif cont_vib >= 5:
             alarm = True
@@ -490,7 +569,9 @@ def alarmsys():
                 buzzer.turn_on()
                 status = "Abnormal structure movement detected"
                 log("Abnormal structure movement detected")
+                show_image_event()
                 cam.take()
+                send_image_mqtt()
                 prevalarm = alarm
 
 def resetalarm():
@@ -504,6 +585,7 @@ def resetalarm():
     status = "Normal"
     log("Alarm reseted")
     prevalarm = alarm
+
 
 def accelerosystem():
     global prev_x,prev_y,prev_z,acc,cont_vib
@@ -599,12 +681,14 @@ def main():
 
 
 
-# WEBSIE CODE
+
 app = Flask(__name__)
 app.secret_key = 'piot_smart_home'
 
 
-
+@app.route('/')
+def index():
+    return redirect(url_for('home'))
 
 @app.route('/login', methods=['GET','POST'])
 def login():
@@ -630,7 +714,13 @@ def home():
     else: 
        return render_template('index.html')
             
-
+@app.route('/log')
+def logs():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    else: 
+       logs = load_logs()
+       return render_template('log.html', logs = logs)
             
 
             

@@ -86,12 +86,14 @@ margin-right: 10px
 <div class="topnav">
   <a class="active" href="#home">Home</a>
   <a href="/log">Logs</a>
+
+
   <a href="/logout">Log out</a>
 </div>
 <div class = 'title'>
 <h2>🏠︎ AIO Smart-Home</h2>
 
-<h5>Local Network</h5>
+<h5>Online, Hello {{user}}, House: {{house}}</h5>
 </div>
 <div class="grid">
   <div class="box">
@@ -117,8 +119,8 @@ margin-right: 10px
 <div>Auto: <span class="value" id="window_auto">On</span> </div> <br><button id="togglewindow" class= "btn">Toggle window</button><button id="toggleautowindow"class= "btn">Toggle auto</button>
 </div>
   <div class="longbox"><h4>Status:</h4><span class ="value" id="status">FIRE!</span><br><button id="resetalarm"class= "btn">Reset alarm</button></div>
-<div class="longbox"><h4>House camera</h4><img id="latest-photo" src="{{ url_for('static', filename='image/image.jpg') }}" width="400" 
-     onerror="this.style.display='none'"><br> <button id="takephoto"class= "btn">Take photo</button></div>
+<div class="longbox"><h4>House camera</h4><img id="latest-photo" src="{{ url_for('get_camera') }}" width="400" onerror="this.style.display='none'">
+<br> <button id="takephoto"class= "btn">Take photo</button></div>
 
 
 </div>
@@ -192,7 +194,8 @@ async function updateSensors() {
 function refreshImage() {
     const img = document.getElementById('latest-photo');
     const timestamp = new Date().getTime(); // cache-busting
-    img.src = "{{ url_for('static', filename='image/image.jpg') }}" + "?v=" + timestamp;
+    // Call Flask route 'get_camera' instead of static file
+    img.src = "{{ url_for('get_camera') }}" + "?v=" + timestamp;
     img.style.display = 'inline'; // show if it loads successfully
 }
 
@@ -201,3 +204,5 @@ setInterval(refreshImage, 1000);
     updateSensors(); // Initial call
   </script>
 </body>
+
+
